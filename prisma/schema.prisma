@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  STAFF
+  USER
+}
+
+enum OrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  BROKEN
+}
+
+// Helper models for JSON fields or simple relations could be added here
+// For now, we stick to the core entities requested
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  fullName  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  staffProfile Staff? // Optional, only if role is STAFF/ADMIN and they have staff details
+}
+
+model Staff {
+  id          String   @id @default(uuid())
+  nip         String   @unique
+  fullName    String
+  dob         DateTime
+  address     String
+  phoneNumber String
+  email       String   @unique
+  role        Role     @default(STAFF)
+  
+  userId      String?  @unique
+  user        User?    @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations for staff activities
+  reports     SiteReport[]
+  requests    PurchaseOrder[]
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  name        String   // Cement, Iron, Sand, etc.
+  sku         String   @unique
+  quantity    Float    @default(0)
+  unit        String   // kg, ton, zak, etc.
+  location    String?
+  minStock    Float    @default(10)
+
+  transactions InventoryTransaction[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryTransaction {
+  id          String   @id @default(uuid())
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  type        String    // IN, OUT
+  quantity    Float
+  notes       String?
+  date        DateTime  @default(now())
+  
+  createdAt   DateTime @default(now())
+}
+
+model PurchaseOrder {
+  id          String      @id @default(uuid())
+  staffId     String
+  staff       Staff       @relation(fields: [staffId], references: [id])
+  
+  itemName    String
+  quantity    Float
+  unit        String
+  status      OrderStatus @default(PENDING)
+  vendor      String?
+  notes       String?
+  
+  approvedBy  String?     // Admin ID or Name
+  approvedAt  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Equipment {
+  id          String          @id @default(uuid())
+  name        String
+  type        String
+  status      EquipmentStatus @default(AVAILABLE)
+  location    String?         // GPS coordinates or site name
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SiteReport {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id])
+  
+  date        DateTime @default(now())
+  weather     String
+  workerCount Int
+  progress    String   // Text description
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
